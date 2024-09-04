@@ -477,12 +477,6 @@ pimcore.bundle.advancedObjectSearch.searchConfig.resultPanel = Class.create(pimc
     },
 
     exportPrepare: function (settings, exportType) {
-        var jobs = [];
-
-        var fields = this.getGridConfig().columns;
-        var fieldKeys = this.mapRequestParameter(fields); 
-
-
         //create the ids array which contains chosen rows to export
         var ids = [];
         var selectedRows = this.grid.getSelectionModel().getSelection();
@@ -496,7 +490,7 @@ pimcore.bundle.advancedObjectSearch.searchConfig.resultPanel = Class.create(pimc
             objecttype: this.objecttype,
             language: this.gridLanguage,
             "ids[]": ids,
-            "fields[]": fieldKeys,
+            "fields[]": this.getExportFieldsString(),
             customFilter: Ext.encode(this.extensionBag.getFilterData())
         };
 
@@ -509,35 +503,27 @@ pimcore.bundle.advancedObjectSearch.searchConfig.resultPanel = Class.create(pimc
             success: function (response) {
                 var rdata = Ext.decode(response.responseText);
 
-                var fields = this.getGridConfig().columns;
-				var fieldKeys = this.mapRequestParameter(fields); 
-
-
                 if (rdata.success && rdata.jobs) {
-                    this.exportProcess(rdata.jobs, rdata.fileHandle, fieldKeys, true, settings, exportType);
+                    this.exportProcess(rdata.jobs, rdata.fileHandle, this.getExportFieldsString(), true, settings, exportType);
                 }
 
             }.bind(this)
         });
     },
-   
-	mapRequestParameter: function(fields )
-    {
-        var fieldKeys = Object.keys(fields);
-        var fieldKeys2 = [];
-        for(var i = 0; i < fieldKeys.length; i++) {
-            var field = fields[fieldKeys[i]];
-            if(!field.hidden) {
-                var fc = {
-                    key: fieldKeys[i],
-                    label: field.fieldConfig.label,
 
-                };
-                fieldKeys2.push(fc);
-            }
+    getExportFieldsString: function () {
+        const gridColumns = this.getGridConfig().columns;
+
+        const gridExportColumns = [];
+        for (const [key, value] of Object.entries(gridColumns)) {
+            gridExportColumns.push({
+                key: key,
+                label: value.fieldConfig.label
+            });
         }
-        return JSON.stringify(fieldKeys2);
-    },
+        
+        return Ext.encode(gridExportColumns);
+    },  
 
     openColumnConfig: function () {
         var fields = this.getGridConfig().columns;
