@@ -15,8 +15,10 @@
 
 namespace AdvancedObjectSearchBundle\DependencyInjection;
 
+use AdvancedObjectSearchBundle\Enum\ClientType;
 use AdvancedObjectSearchBundle\Maintenance\UpdateQueueProcessor;
 use AdvancedObjectSearchBundle\Messenger\QueueHandler;
+use RuntimeException;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
@@ -64,9 +66,19 @@ class AdvancedObjectSearchExtension extends ConfigurableExtension implements Pre
 
         $definition = $container->getDefinition(UpdateQueueProcessor::class);
         $definition->setArgument('$messengerQueueActivated', $config['messenger_queue_processing']['activated']);
+        if ($config['client_type'] === ClientType::OPEN_SEARCH->value) {
+            $openSearchClientId = 'pimcore.open_search_client.' . $config['client_name'];
+            $container->setAlias('pimcore.advanced_object_search.opensearch-client', $openSearchClientId)
+                ->setDeprecated(
+                    'pimcore/advanced-object-search',
+                    '6.1',
+                    'The "%alias_id%" service alias is deprecated and will be removed in version 7.0. ' .
+                    'Please use "pimcore.advanced_object_search.search-client" instead.'
+                );
+        }
 
-        $openSearchClientId = 'pimcore.open_search_client.' . $config['client_name'];
-        $container->setAlias('pimcore.advanced_object_search.opensearch-client', $openSearchClientId);
+        $clientId = $this->getDefaultSearchClientId($config);
+        $container->setAlias('pimcore.advanced_object_search.search-client', $clientId);
     }
 
     /**
@@ -82,5 +94,22 @@ class AdvancedObjectSearchExtension extends ConfigurableExtension implements Pre
 
             $loader->load('doctrine_migrations.yml');
         }
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    private function getDefaultSearchClientId(array $indexSettings): string
+    {
+        $clientType = $indexSettings['client_type'];
+        $clientName = $indexSettings['client_name'];
+
+        return match ($clientType) {
+            ClientType::OPEN_SEARCH->value => 'pimcore.openSearch.custom_client.' . $clientName,
+            ClientType::ELASTIC_SEARCH->value => 'pimcore.elasticsearch.custom_client.' . $clientName,
+            default => throw new RuntimeException(
+                sprintf('Invalid client type: %s', $clientType)
+            )
+        };
     }
 }
